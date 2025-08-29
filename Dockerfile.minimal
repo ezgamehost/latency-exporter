@@ -1,0 +1,43 @@
+# Ultra-minimal Dockerfile using Chainguard's static image
+# This version excludes fping/ICMP support for maximum security
+FROM cgr.dev/chainguard/go:latest-dev as builder
+
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source
+COPY . .
+
+# Build static binary
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o latency-exporter \
+    ./cmd/latency-exporter
+
+# Final stage - minimal static image (no shell, no package manager)
+FROM cgr.dev/chainguard/static:latest
+
+# Copy binary
+COPY --from=builder /app/latency-exporter /latency-exporter
+
+# Copy config
+COPY config/example.yml /var/latency-parser/config.yml
+
+# Expose port
+EXPOSE 8080
+
+# Run as non-root (static image defaults to non-root user)
+USER 65532:65532
+
+# Set environment
+ENV LATENCY_PARSER_CONFIG_PATH=/var/latency-parser/config.yml
+
+# Health check using the binary itself (no curl/wget available)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD ["/latency-exporter", "-health-check"] || exit 1
+
+ENTRYPOINT ["/latency-exporter"]

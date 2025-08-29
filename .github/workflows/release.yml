@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Build binaries for multiple platforms
+      run: make build-all
+
+    - name: Create release archives
+      run: |
+        cd build
+        
+        # Create archives for each binary
+        tar -czf latency-exporter-linux-amd64.tar.gz latency-exporter-linux-amd64
+        tar -czf latency-exporter-darwin-amd64.tar.gz latency-exporter-darwin-amd64
+        tar -czf latency-exporter-darwin-arm64.tar.gz latency-exporter-darwin-arm64
+        zip latency-exporter-windows-amd64.zip latency-exporter-windows-amd64.exe
+        
+        # Generate checksums
+        sha256sum *.tar.gz *.zip > checksums.txt
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -z "$PREV_TAG" ]; then
+          echo "changelog=Initial release" >> $GITHUB_OUTPUT
+        else
+          # Generate changelog from commits
+          CHANGELOG=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/*.tar.gz
+          build/*.zip
+          build/checksums.txt
+        body: |
+          ## Changes
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ## Docker Images
+          
+          ### Standard Image (HTTP + ICMP)
+          ```bash
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          ```
+          
+          ### Minimal Image (HTTP only)
+          ```bash
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-minimal:${{ github.ref_name }}
+          ```
+          
+          ## Quick Start
+          
+          ### Binary Installation
+          ```bash
+          # Download and extract for your platform
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/latency-exporter-linux-amd64.tar.gz | tar -xz
+          
+          # Run with example config
+          LATENCY_PARSER_CONFIG_PATH=config/example.yml ./latency-exporter-linux-amd64
+          ```
+          
+          ### Docker
+          ```bash
+          # Create config directory
+          mkdir -p config
+          curl -o config/config.yml https://raw.githubusercontent.com/${{ github.repository }}/main/config/example.yml
+          
+          # Run container
+          docker run -p 8080:8080 -v $(pwd)/config:/var/latency-parser ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          ```
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update latest tag
+      run: |
+        git tag -f latest
+        git push origin latest --force

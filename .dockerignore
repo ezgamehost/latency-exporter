@@ -1,0 +1,38 @@
+# Build artifacts
+build/
+*.exe
+latency-exporter
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+*_test.go
+coverage.out
+coverage.html
+
+# Temporary files
+*.tmp
+*.log
+
+# Docker files (avoid recursion)
+Dockerfile*
+.dockerignore
+
+# Go module cache (will be rebuilt)
+vendor/

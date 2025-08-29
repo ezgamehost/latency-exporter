@@ -1,0 +1,15 @@
+global:
+  dns:
+    resolver: 1.1.1.1
+  metrics_endpoint: /metrics
+
+
+destinations:
+  - name: Google.com https
+    endpoint: https://google.com
+    method: http
+    metrics_slug: google.com
+  - name: Cloudflare IP
+    endpoint: 1.1.1.1
+    method: icmp
+    metrics_slug: cloudflare
