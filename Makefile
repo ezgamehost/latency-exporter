@@ -105,11 +105,7 @@ docker-run-minimal: docker-build-minimal
 	@echo "Running minimal Docker container..."
 	docker run --rm -p 8080:8080 $(BINARY_NAME):$(VERSION)-minimal
 
-.PHONY: docker-scan
-docker-scan: docker-build
-	@echo "Scanning Docker image for vulnerabilities..."
-	@which trivy > /dev/null || (echo "trivy not installed, install with: brew install trivy" && exit 1)
-	trivy image $(BINARY_NAME):$(VERSION)
+
 
 # Development helpers
 .PHONY: dev
@@ -176,7 +172,6 @@ help:
 	@echo "  docker-build-minimal - Build minimal Docker image (HTTP only)"
 	@echo "  docker-run    - Build and run Docker container"
 	@echo "  docker-run-minimal - Build and run minimal Docker container"
-	@echo "  docker-scan   - Scan Docker image for vulnerabilities"
 	@echo "  fmt           - Format code"
 	@echo "  vet           - Run go vet"
 	@echo "  lint          - Run golangci-lint"
